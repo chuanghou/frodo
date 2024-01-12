@@ -29,8 +29,10 @@ public class JettyServer {
                 public void handle(String target, Request request,
                                    HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException {
 
+                    request.setHandled(true);
                     byte[] bytes = IOUtils.toByteArray(httpRequest.getInputStream());
                     if (bytes.length == 0) {
+                        System.out.println();
                         httpResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                         return;
                     }
@@ -55,14 +57,13 @@ public class JettyServer {
                     }
 
                     httpResponse.setContentType("application/json;charset=UTF-8");
-                    request.setHandled(true);
                 }
             });
 
             try {
                 server.start();
-            } catch (Exception exception) {
-                exception.printStackTrace();
+            } catch (Throwable throwable) {
+                logger.warn(throwable);
             }
 
             try {
