@@ -18,68 +18,60 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 public class JettyServer {
 
-    private static final Logger logger = Log.getLogger(Server.class);
+    private final Logger logger = Log.getLogger(Server.class);
 
-    private static final JdkCompiler jdkCompiler = new JdkCompiler();
+    private final JdkCompiler jdkCompiler = new JdkCompiler();
 
-    static private final Pattern scriptPattern = Pattern.compile("public\\s+class\\s+[a-zA-Z0-9_]+\\s+implements Callable<String>\\s*\\{");
+    private final Pattern scriptPattern = Pattern.compile("public\\s+class\\s+[a-zA-Z0-9_]+\\s+implements Callable<String>\\s*\\{");
 
-    static {
-        CompletableFuture.runAsync(() -> {
 
-            String rawPort = System.getProperty("frodo.port");
-            Integer port = StringUtil.isBlank(rawPort) ? 24113 : Integer.parseInt(rawPort);
-            Server server = new Server(port);
-
-            server.setHandler(new AbstractHandler() {
-                @Override
-                public void handle(String target, Request request,
-                                   HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException {
-                    request.setHandled(true);
-                    byte[] bytes = IOUtils.toByteArray(httpRequest.getInputStream());
-                    String rawCharset = httpRequest.getCharacterEncoding();
-                    Charset charset = StringUtil.isBlank(rawCharset) ? StandardCharsets.UTF_8 : Charset.forName(rawCharset);
-                    CharsetDecoder decoder = charset.newDecoder();
-                    ByteBuffer buf = ByteBuffer.wrap(bytes);
-                    String requestBody;
-                    try {
-                        requestBody = decoder.decode(buf).toString();
-                    } catch(CharacterCodingException e){
-                        httpResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                        logger.warn(e);
-                        return;
-                    }
-
-                    httpResponse.setContentType("application/json;charset=" + charset.name());
-                    httpResponse.setCharacterEncoding(charset.name());
-                    httpResponse.getWriter().write(process(requestBody));
-
+    public JettyServer(Integer port) {
+        port = Optional.ofNullable(port).orElse(24113);
+        Server server = new Server(port);
+        server.setHandler(new AbstractHandler() {
+            @Override
+            public void handle(String target, Request request,
+                               HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException {
+                request.setHandled(true);
+                byte[] bytes = IOUtils.toByteArray(httpRequest.getInputStream());
+                String rawCharset = httpRequest.getCharacterEncoding();
+                Charset charset = StringUtil.isBlank(rawCharset) ? StandardCharsets.UTF_8 : Charset.forName(rawCharset);
+                CharsetDecoder decoder = charset.newDecoder();
+                ByteBuffer buf = ByteBuffer.wrap(bytes);
+                String requestBody;
+                try {
+                    requestBody = decoder.decode(buf).toString();
+                } catch (CharacterCodingException e) {
+                    httpResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    logger.warn(e);
+                    return;
                 }
-            });
 
-            try {
-                server.start();
-            } catch (Throwable throwable) {
-                logger.warn(throwable);
+                httpResponse.setContentType("application/json;charset=" + charset.name());
+                httpResponse.setCharacterEncoding(charset.name());
+                httpResponse.getWriter().write(process(requestBody));
+
             }
+        });
 
-            try {
-                server.join();
-            } catch (InterruptedException ignore) {}
-        }, Executors.newSingleThreadExecutor());
+        try {
+            server.start();
+        } catch (Throwable throwable) {
+            logger.warn(throwable);
+        }
 
     }
 
     @SuppressWarnings({"unchecked", "ResultOfMethodCallIgnored"})
-    static public String process(String request) {
+    public String process(String request) {
 
         Matcher matcher = scriptPattern.matcher(request);
 
@@ -104,13 +96,14 @@ public class JettyServer {
 
     }
 
-    static private String wrapper(String code) {
-        return "\\*------------------------------------------------------------------------*\\\n\n"
-                + code
-                + "\n\n\\*------------------------------------------------------------------------*\\\n";
+    private String wrapper(String code) {
+        StringBuilder builder = new StringBuilder();
+        IntStream.range(0, 40).forEach(i -> builder.append("-"));
+        String line = builder.toString();
+        return "\\*" + line + "*\\\n\n" + code + "\n\n\\*" + line + "*\\\n";
     }
 
-    static private String printable(Throwable throwable) {
+    private String printable(Throwable throwable) {
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         throwable.printStackTrace(pw);
