@@ -81,6 +81,12 @@ public class JdkCompiler {
         javaFileManager = new JavaFileManagerImpl(manager, classLoader);
     }
 
+
+    static public Class<?> load(String code) {
+        JdkCompiler jdkCompiler = new JdkCompiler();
+        return jdkCompiler.compile(code);
+    }
+
     public JdkCompiler() {
         this(buildDefaultOptions());
     }

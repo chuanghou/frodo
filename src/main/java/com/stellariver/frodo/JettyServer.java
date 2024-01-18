@@ -28,7 +28,6 @@ public class JettyServer {
 
     private final Logger logger = Log.getLogger(Server.class);
 
-    private final JdkCompiler jdkCompiler = new JdkCompiler();
 
     private final Pattern scriptPattern = Pattern.compile("public\\s+class\\s+[a-zA-Z0-9_]+\\s+implements Callable<String>\\s*\\{");
 
@@ -86,7 +85,7 @@ public class JettyServer {
         }
 
         try {
-            Class<?> clazz = jdkCompiler.compile(request);
+            Class<?> clazz = JdkCompiler.load(request);
             Class<Callable<String>> callableClass = (Class<Callable<String>>) clazz;
             Callable<String> callable = callableClass.newInstance();
             return callable.call();
